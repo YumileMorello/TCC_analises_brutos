@@ -1,0 +1,143 @@
+---
+title: "Análise Fatorial Exploratória"
+output:
+  html_document:
+    theme: cosmo
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_float: true
+---
+
+# Aspectos descritivos e teóricos dos itens
+
+Os itens desta escala são provenientes da tradução dos itens para medição de viés de falso consenso de Fulano.
+Em sua utilização original, os voluntários respondiam os mesmos itens no que se refere à concordância de si mesmo e do seu ingroup.
+
+Aqui, tentaremos extrair uma escala político-ideológica a partir destes itens.
+
+Liberal vs Conservador.  
+Moral/Religião/Tradicionalismo, Economia.  
+
+- Fator G: não  
+- Correlação entre fatores: sim  
+- Número de fatores:  
+
+```{r, include=FALSE}
+# This block allows the use of 'max.height' to activate scrolling
+# of code output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+```{r message=FALSE}
+library(here)
+library(psych)
+library(tidyverse)
+library(huxtable)
+```
+
+```{r}
+load(here("data","dados_AF_preprocessados.Rdata"))
+
+#names(vies)
+```
+
+```{r}
+dados_efa <- 
+  vies %>% select(-c(1:4,160)) %>% 
+  filter(c(1:n()) %in% seq(2,n(),2))
+dados_cfa <- 
+  vies %>% select(-c(1:4,160)) %>% 
+  filter(c(1:n()) %in% seq(1,n()-1,2))
+
+```
+
+## Fatorabilidade
+```{r}
+cor_efa <- cor(dados_efa)
+
+cortest.bartlett(cor_efa, n = 276)
+```
+```{r max.height = '300px'}
+kmo <- KMO(cor_efa)
+kmo
+```
+
+## Número de fatores
+```{r max.height = '300px'}
+VSS(dados_efa, rotate = "varimax", fm = "ml", plot = F, n = 15,maxit = 5000)
+```
+
+```{r}
+fa.parallel(dados_efa,fm = "ml")
+```
+## Extração de fatores
+```{r}
+fa_3 <- fa(dados_efa, 3, rotate = "varimax", fm = "ml")
+
+cargas_3 <- as.data.frame(matrix(fa_3$loadings,nrow = 155, ncol = 3)) %>% 
+  rename_with(~paste("Fator",str_extract(.x, "[:xdigit:]{1,2}"))) %>% 
+  mutate(Item = names(dados_efa), across(where(is.numeric), round, digits = 3)) %>% 
+  mutate(
+    across(c(1:3),
+           list(abs = ~round(abs(.x),3)))) %>% 
+  select(c(4,1:3,5:7))
+```
+
+```{r}
+fa_12 <- fa(dados_efa, 12, rotate = "varimax", fm = "ml")
+
+cargas_12 <- as.data.frame(matrix(fa_12$loadings,nrow = 155, ncol = 12)) %>% 
+  rename_with(~paste("Fator",str_extract(.x, "[:xdigit:]{1,2}"))) %>% 
+  mutate(Item = names(dados_efa), across(where(is.numeric), round, digits = 3)) %>% 
+  mutate(
+    across(c(1:12),
+           list(abs = ~round(abs(.x),3)))) %>% 
+  select(c(13,1:12,14:25))
+
+#fa_12
+```
+
+```{r}
+fac_hux <- function(dt, nfac){
+  fac_name <- paste("Fator", nfac)
+  fac_name_abs <- paste0("Fator ", nfac,"_abs")
+  pretty_print <- 
+  dt %>%
+    select(1,
+      matches(
+        paste0(fac_name,"\\>|", fac_name,"_abs")
+        )
+      ) %>% 
+    arrange(desc(.data[[fac_name_abs]])) %>%
+    select(c(1:2)) %>% 
+    filter(.data[[fac_name]] >= .4) %>% 
+    hux() %>% 
+    set_caption(paste("Fator", nfac)) %>% 
+    theme_article()
+  pretty_print
+}
+
+
+```
+
+## Cargas modelo 3 fatores
+```{r results='asis'}
+walk(map2(list(cargas_3),c(1:3),fac_hux), print_html)
+```
+
+## Cargas modelo 12 fatores
+```{r results='asis'}
+walk(map2(list(cargas_12),c(1:12),fac_hux), print_html)
+```
+
