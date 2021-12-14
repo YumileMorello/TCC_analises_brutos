@@ -1,2 +1,0 @@
-# escala-ideologia-vfc
- 
